@@ -1,0 +1,86 @@
+You are a senior full-stack developer building a browser-based web application for creating stop motion videos from uploaded video files. Build this as a single HTML file with embedded CSS and JavaScript — no build tools, no frameworks, no external dependencies beyond a lightweight GIF encoder loaded from CDN.
+
+## Core Features
+
+### 1. Video Upload & Playback
+- Accept video files via drag-and-drop or file picker (.mp4, .webm, .mov).
+- Display the video in a `<video>` element with native controls.
+- Show the current timestamp (mm:ss.ms) next to the video.
+
+### 2. Frame Seeking & Capture
+- Keyboard navigation while video is paused:
+  - **Left/Right arrow keys**: step backward/forward by 1 frame.
+  - **Shift + Left/Right**: jump backward/forward by 10 frames.
+  - **Space**: toggle play/pause.
+- A prominent "Capture Frame" button that snaps the current video frame into the timeline below.
+- Visual feedback (brief flash or highlight) when a frame is captured.
+- Show a thumbnail strip (timeline) of all captured frames in order.
+
+### 3. Timeline Management
+- Click a thumbnail to select it (highlighted border).
+- Drag thumbnails to reorder frames.
+- Press **Delete** or click an "×" button on a selected frame to remove it.
+- Duplicate a frame via a button or keyboard shortcut (**Ctrl/Cmd + D**).
+- Show frame count above the timeline.
+
+### 4. Stop Motion Settings Panel
+- **Frame duration** slider (50ms to 2000ms, default 200ms) — how long each captured frame displays in the final GIF.
+- **Loop count** input (0 = infinite, 1–10 or specific number).
+- **Output resolution** dropdown:
+  - Original video resolution
+  - Half resolution
+  - Custom width (constrain proportions)
+- **Onion skinning** toggle: when enabled, show a semi-transparent overlay of the previous captured frame on top of the video preview to help align shots (opacity slider 10%–80%, default 30%).
+
+### 5. Preview
+- "Preview" button that plays back all captured frames at the chosen frame duration, in order, inside a modal or side panel.
+- Use `<canvas>` to render the preview at the chosen output resolution.
+- Preview controls: play/pause, restart.
+
+### 6. GIF Export
+- Use the `gif.js` or `gif.js.optimized` library loaded via CDN to encode the captured frames into an animated GIF.
+- Show a progress bar during encoding.
+- Once complete, display the resulting GIF in an `<img>` tag with a "Download" button.
+- The download filename should be `stopmotion_YYYY-MM-DD_HH-MM-SS.gif`.
+
+## Technical Requirements
+- Everything in a single HTML file. No npm, no bundler, no framework.
+- Load `gif.js.optimized` from CDN: `https://cdn.jsdelivr.net/npm/gif.js.optimized@2.0.1/dist/gif.optimized.min.js`
+- Use `<canvas>` for frame capture from video and for GIF frame preparation.
+- Handle large video files efficiently — don't store full video data, only the captured frame image data as base64 or ImageData in memory.
+- Mobile-responsive layout:
+  - Video player and settings stack vertically on narrow screens.
+  - Thumbnail strip scrolls horizontally.
+- Dark theme UI with clear visual hierarchy.
+- All state (captured frames, settings) managed in a plain JavaScript object — no state library needed.
+
+## Error Handling
+- Show a user-friendly message if the browser doesn't support the required video codec.
+- Warn the user if they try to export a GIF with zero captured frames.
+- Warn if the total estimated GIF file size would exceed 50MB (based on frame count × resolution), but don't block the export.
+
+## UI Layout (Desktop)
+```
+┌──────────────────────────────────────────────┐
+│  Video Player                                │
+│  ┌──────────────────────────────┐            │
+│  │                              │  Settings  │
+│  │         Video                │  ┌────────┐│
+│  │                              │  │Duration││
+│  │                              │  │Loop    ││
+│  │                              │  │Resol.  ││
+│  │                              │  │Onion   ││
+│  └──────────────────────────────┘  └────────┘│
+│  [◀◀] [◀] [▶/⏸] [▶] [▶▶]  [Capture Frame]  │
+│  Timestamp: 00:03.240                        │
+├──────────────────────────────────────────────┤
+│  Timeline: 14 frames                         │
+│  ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐         │
+│  │  1 │ │  2 │ │  3 │ │  4 │ │  5 │ ...     │
+│  └────┘ └────┘ └────┘ └────┘ └────┘         │
+├──────────────────────────────────────────────┤
+│  [Preview]  [Export GIF]                     │
+└──────────────────────────────────────────────┘
+```
+
+Build this application now. Write complete, working code. Do not use placeholder comments or TODOs.
