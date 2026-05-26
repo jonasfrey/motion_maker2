@@ -123,6 +123,14 @@ header p { color: var(--text-dim); font-size: 0.9rem; margin-top: 4px; }
 .size-warning { background: rgba(243,156,18,0.15); border: 1px solid var(--warning); border-radius: 8px; padding: 10px 14px; margin-top: 12px; font-size: 0.85rem; color: var(--warning); display: none; }
 .size-warning.show { display: block; }
 
+.seek-bar-wrap { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.seek-bar-wrap .time-label { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.78rem; color: var(--text-dim); min-width: 72px; }
+.seek-bar-wrap .time-label.current { color: var(--accent); text-align: right; }
+.seek-bar-wrap .time-label.duration { text-align: left; }
+.seek-bar { flex: 1; -webkit-appearance: none; appearance: none; height: 6px; background: var(--border); border-radius: 3px; outline: none; cursor: pointer; }
+.seek-bar::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid #fff; }
+.seek-bar::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid #fff; }
+
 .capture-flash { position: absolute; inset: 0; background: rgba(255,255,255,0.3); pointer-events: none; border-radius: 8px; animation: flash 0.3s ease-out forwards; }
 @keyframes flash { 0% { opacity: 1; } 100% { opacity: 0; } }
 
@@ -154,6 +162,11 @@ header p { color: var(--text-dim); font-size: 0.9rem; margin-top: 4px; }
           <p>or <span class="browse-link" id="browseLink">browse</span> to select one</p>
           <input type="file" id="fileInput" accept="video/mp4,video/webm,video/quicktime,.mov" style="display:none">
         </div>
+      </div>
+      <div class="seek-bar-wrap">
+        <span class="time-label current" id="seekCurrent">00:00.000</span>
+        <input type="range" class="seek-bar" id="seekBar" min="0" max="100" value="0" step="0.001" disabled>
+        <span class="time-label duration" id="seekDuration">00:00.000</span>
       </div>
       <div class="video-toolbar">
         <button class="btn" id="btnStepBack10" title="Shift+Left: Back 10 frames">⏪ -10</button>
@@ -269,6 +282,10 @@ const onionOverlay = $('#onionOverlay');
 const onionImg = $('#onionImg');
 const previewCanvas = $('#previewCanvas');
 const previewCtx = previewCanvas.getContext('2d');
+const seekBar = $('#seekBar');
+const seekCurrent = $('#seekCurrent');
+const seekDuration = $('#seekDuration');
+let seekDragging = false;
 
 // ---- Video Upload ----
 
@@ -301,6 +318,10 @@ function loadVideo(file) {
 video.addEventListener('loadedmetadata', () => {
   captureCanvas.width = video.videoWidth;
   captureCanvas.height = video.videoHeight;
+  seekBar.max = video.duration;
+  seekBar.value = 0;
+  seekBar.disabled = false;
+  seekDuration.textContent = formatTime(video.duration);
   updateTimestamp();
 });
 
@@ -310,15 +331,37 @@ video.addEventListener('error', () => {
 
 // ---- Timestamp ----
 
-function updateTimestamp() {
-  const t = video.currentTime || 0;
+function formatTime(t) {
   const min = Math.floor(t / 60);
   const sec = Math.floor(t % 60);
   const ms = Math.floor((t % 1) * 1000);
-  timestamp.textContent = `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;
+  return `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;
+}
+
+function updateTimestamp() {
+  const t = video.currentTime || 0;
+  timestamp.textContent = formatTime(t);
+  if (!seekDragging) {
+    seekBar.value = t;
+    seekCurrent.textContent = formatTime(t);
+  }
 }
 
 video.addEventListener('timeupdate', updateTimestamp);
+
+// ---- Seek Bar ----
+
+seekBar.addEventListener('input', () => {
+  seekDragging = true;
+  video.pause();
+  video.currentTime = parseFloat(seekBar.value);
+  seekCurrent.textContent = formatTime(video.currentTime);
+});
+
+seekBar.addEventListener('change', () => {
+  seekDragging = false;
+  video.currentTime = parseFloat(seekBar.value);
+});
 
 // ---- Frame Seeking ----
 
