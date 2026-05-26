@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stop Motion Maker</title>
+<script src="https://cdn.jsdelivr.net/npm/gif.js.optimized@2.0.1/dist/gif.optimized.min.js"></script>
+<style>
+/* license GPL Jonas Immanuel Frey */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --surface2: #0f3460;
+  --border: #2a2a4a;
+  --text: #e0e0e0;
+  --text-dim: #888;
+  --accent: #e94560;
+  --accent2: #533483;
+  --success: #2ecc71;
+  --warning: #f39c12;
+  --danger: #e74c3c;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+  line-height: 1.5;
+}
+.app { max-width: 1400px; margin: 0 auto; padding: 16px; }
+header { text-align: center; padding: 16px 0 24px; }
+header h1 { font-size: 1.8rem; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
+header p { color: var(--text-dim); font-size: 0.9rem; margin-top: 4px; }
+
+.main-layout { display: grid; grid-template-columns: 1fr 280px; gap: 16px; }
+.video-section { background: var(--surface); border-radius: 12px; padding: 16px; border: 1px solid var(--border); }
+.video-container { position: relative; background: #000; border-radius: 8px; overflow: hidden; min-height: 300px; display: flex; align-items: center; justify-content: center; }
+.video-container video { width: 100%; max-height: 500px; display: block; }
+.video-container canvas { display: none; }
+.drop-overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(233,69,96,0.1); border: 3px dashed var(--accent); border-radius: 8px;
+  pointer-events: none; opacity: 0; transition: opacity 0.2s;
+}
+.drop-overlay.active { opacity: 1; }
+.drop-overlay span { color: var(--accent); font-size: 1.2rem; font-weight: 600; }
+.upload-prompt { color: var(--text-dim); text-align: center; padding: 40px; }
+.upload-prompt svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.5; }
+.upload-prompt p { margin-top: 8px; font-size: 0.9rem; }
+.upload-prompt .browse-link { color: var(--accent); cursor: pointer; text-decoration: underline; }
+
+.video-toolbar { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+  border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+  font-size: 0.85rem; font-weight: 500; transition: all 0.15s;
+  background: var(--surface2); color: var(--text); white-space: nowrap;
+}
+.btn:hover { background: #1a4080; border-color: #4a4a7a; }
+.btn:active { transform: scale(0.97); }
+.btn.accent { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn.accent:hover { background: #d13450; }
+.btn.danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+.btn.danger:hover { background: var(--danger); color: #fff; }
+.btn.small { padding: 4px 10px; font-size: 0.78rem; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+.timestamp { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.9rem; color: var(--accent); font-weight: 500; margin-left: auto; }
+
+.settings-panel { background: var(--surface); border-radius: 12px; padding: 16px; border: 1px solid var(--border); height: fit-content; }
+.settings-panel h3 { font-size: 0.95rem; margin-bottom: 16px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.setting-group { margin-bottom: 16px; }
+.setting-group label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px; color: var(--text-dim); }
+.setting-group label span.val { color: var(--text); font-weight: 500; }
+.setting-group input[type="range"] { width: 100%; accent-color: var(--accent); }
+.setting-group input[type="number"] { width: 100%; padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.85rem; }
+.setting-group select { width: 100%; padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.85rem; }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.toggle-row span { font-size: 0.85rem; }
+.toggle { position: relative; width: 44px; height: 24px; cursor: pointer; }
+.toggle input { display: none; }
+.toggle .slider { position: absolute; inset: 0; background: var(--border); border-radius: 12px; transition: 0.2s; }
+.toggle input:checked + .slider { background: var(--accent); }
+.toggle .slider::after { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+.toggle input:checked + .slider::after { transform: translateX(20px); }
+
+.timeline-section { margin-top: 16px; background: var(--surface); border-radius: 12px; padding: 16px; border: 1px solid var(--border); }
+.timeline-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.timeline-header h3 { font-size: 0.95rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.timeline-header .frame-count { color: var(--accent); font-weight: 600; }
+.timeline-strip { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0; min-height: 90px; align-items: center; scroll-behavior: smooth; }
+.timeline-strip:empty::after { content: 'Capture frames to build your animation'; color: var(--text-dim); font-size: 0.85rem; white-space: nowrap; padding: 20px; }
+.thumbnail-wrap { position: relative; flex-shrink: 0; cursor: pointer; border-radius: 6px; overflow: hidden; border: 2px solid transparent; transition: border-color 0.15s, transform 0.15s; }
+.thumbnail-wrap.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(233,69,96,0.3); }
+.thumbnail-wrap.dragging { opacity: 0.5; transform: scale(0.95); }
+.thumbnail-wrap.drag-over { border-color: var(--success); }
+.thumbnail-wrap img { display: block; width: 100px; height: 70px; object-fit: cover; }
+.thumbnail-wrap .frame-num { position: absolute; top: 2px; left: 4px; font-size: 0.65rem; background: rgba(0,0,0,0.7); color: #fff; padding: 1px 5px; border-radius: 3px; pointer-events: none; }
+.thumbnail-wrap .delete-btn { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; background: var(--danger); color: #fff; border: none; border-radius: 50%; font-size: 0.7rem; cursor: pointer; display: none; align-items: center; justify-content: center; line-height: 1; }
+.thumbnail-wrap:hover .delete-btn { display: flex; }
+.thumbnail-wrap.selected .delete-btn { display: flex; }
+
+.actions-bar { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+
+.onion-overlay { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.2s; }
+.onion-overlay.active { opacity: var(--onion-opacity, 0.3); }
+.onion-overlay img { width: 100%; height: 100%; object-fit: contain; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal { background: var(--surface); border-radius: 12px; padding: 24px; border: 1px solid var(--border); max-width: 90vw; max-height: 90vh; overflow: auto; }
+.modal h3 { margin-bottom: 16px; }
+.modal canvas { max-width: 100%; border-radius: 8px; display: block; margin: 0 auto; }
+.modal-controls { display: flex; gap: 8px; margin-top: 12px; justify-content: center; }
+.modal .close-btn { position: absolute; top: 12px; right: 12px; background: none; border: none; color: var(--text); font-size: 1.5rem; cursor: pointer; }
+
+.export-section { margin-top: 16px; text-align: center; }
+.progress-bar-wrap { background: var(--border); border-radius: 8px; height: 8px; margin: 12px 0; overflow: hidden; display: none; }
+.progress-bar-wrap.active { display: block; }
+.progress-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s; border-radius: 8px; }
+.export-result { margin-top: 16px; }
+.export-result img { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); }
+
+.size-warning { background: rgba(243,156,18,0.15); border: 1px solid var(--warning); border-radius: 8px; padding: 10px 14px; margin-top: 12px; font-size: 0.85rem; color: var(--warning); display: none; }
+.size-warning.show { display: block; }
+
+.capture-flash { position: absolute; inset: 0; background: rgba(255,255,255,0.3); pointer-events: none; border-radius: 8px; animation: flash 0.3s ease-out forwards; }
+@keyframes flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+@media (max-width: 768px) {
+  .main-layout { grid-template-columns: 1fr; }
+  .video-toolbar { justify-content: center; }
+  .timestamp { margin-left: 0; width: 100%; text-align: center; }
+  .thumbnail-wrap img { width: 70px; height: 50px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Stop Motion Maker</h1>
+    <p>Upload a video, capture frames, create animated GIFs</p>
+  </header>
+
+  <div class="main-layout">
+    <div class="video-section" id="videoSection">
+      <div class="video-container" id="videoContainer">
+        <video id="video" style="display:none"></video>
+        <canvas id="captureCanvas" style="display:none"></canvas>
+        <div class="onion-overlay" id="onionOverlay"><img id="onionImg" alt=""></div>
+        <div class="drop-overlay" id="dropOverlay"><span>Drop video here</span></div>
+        <div class="upload-prompt" id="uploadPrompt">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <p>Drag & drop a video file here</p>
+          <p>or <span class="browse-link" id="browseLink">browse</span> to select one</p>
+          <input type="file" id="fileInput" accept="video/mp4,video/webm,video/quicktime,.mov" style="display:none">
+        </div>
+      </div>
+      <div class="video-toolbar">
+        <button class="btn" id="btnStepBack10" title="Shift+Left: Back 10 frames">⏪ -10</button>
+        <button class="btn" id="btnStepBack" title="Left: Back 1 frame">◀ -1</button>
+        <button class="btn" id="btnPlayPause" title="Space: Play/Pause">▶</button>
+        <button class="btn" id="btnStepFwd" title="Right: Forward 1 frame">+1 ▶</button>
+        <button class="btn" id="btnStepFwd10" title="Shift+Right: Forward 10 frames">+10 ⏩</button>
+        <button class="btn accent" id="btnCapture" title="Capture current frame">📷 Capture Frame</button>
+        <span class="timestamp" id="timestamp">00:00.000</span>
+      </div>
+    </div>
+
+    <div class="settings-panel">
+      <h3>Settings</h3>
+      <div class="setting-group">
+        <label>Frame Duration <span class="val" id="durVal">200ms</span></label>
+        <input type="range" id="frameDuration" min="50" max="2000" value="200" step="10">
+      </div>
+      <div class="setting-group">
+        <label>Loop Count</label>
+        <input type="number" id="loopCount" value="0" min="0" max="100" placeholder="0 = infinite">
+      </div>
+      <div class="setting-group">
+        <label>Output Resolution</label>
+        <select id="resolution">
+          <option value="original">Original</option>
+          <option value="half">Half</option>
+          <option value="custom">Custom Width</option>
+        </select>
+      </div>
+      <div class="setting-group" id="customWidthGroup" style="display:none">
+        <label>Custom Width (px)</label>
+        <input type="number" id="customWidth" value="480" min="100" max="3840">
+      </div>
+      <div class="toggle-row">
+        <span>Onion Skinning</span>
+        <label class="toggle"><input type="checkbox" id="onionToggle"><span class="slider"></span></label>
+      </div>
+      <div class="setting-group" id="onionOpacityGroup" style="display:none">
+        <label>Onion Opacity <span class="val" id="onionVal">30%</span></label>
+        <input type="range" id="onionOpacity" min="10" max="80" value="30" step="5">
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-section">
+    <div class="timeline-header">
+      <h3>Timeline</h3>
+      <span class="frame-count" id="frameCount">0 frames</span>
+    </div>
+    <div class="timeline-strip" id="timelineStrip"></div>
+    <div style="margin-top:8px;display:flex;gap:8px">
+      <button class="btn small" id="btnSelectAll">Select All</button>
+      <button class="btn small danger" id="btnClearAll">Clear All</button>
+      <button class="btn small" id="btnDuplicate" title="Ctrl+D: Duplicate selected">Duplicate</button>
+    </div>
+  </div>
+
+  <div class="actions-bar">
+    <button class="btn accent" id="btnPreview">▶ Preview</button>
+    <button class="btn accent" id="btnExport">📦 Export GIF</button>
+  </div>
+
+  <div class="size-warning" id="sizeWarning">Estimated GIF size may exceed 50MB. Export may be slow or produce a very large file.</div>
+
+  <div class="progress-bar-wrap" id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+  <div class="export-result" id="exportResult"></div>
+</div>
+
+<div class="modal-overlay" id="previewModal" style="display:none">
+  <div class="modal" style="position:relative">
+    <button class="close-btn" id="previewClose">&times;</button>
+    <h3>Preview</h3>
+    <canvas id="previewCanvas"></canvas>
+    <div class="modal-controls">
+      <button class="btn" id="previewRestart">↺ Restart</button>
+      <button class="btn accent" id="previewPlayPause">⏸ Pause</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// license GPL Jonas Immanuel Frey
+
+const state = {
+  videoFile: null,
+  videoUrl: null,
+  frames: [],
+  selectedIndex: -1,
+  settings: {
+    frameDuration: 200,
+    loopCount: 0,
+    resolution: 'original',
+    customWidth: 480,
+    onionSkinning: false,
+    onionOpacity: 0.3
+  },
+  previewTimer: null,
+  previewPlaying: false,
+  previewFrameIdx: 0
+};
+
+const $ = (s) => document.querySelector(s);
+
+const video = $('#video');
+const captureCanvas = $('#captureCanvas');
+const captureCtx = captureCanvas.getContext('2d', { willReadFrequently: true });
+const timelineStrip = $('#timelineStrip');
+const timestamp = $('#timestamp');
+const dropOverlay = $('#dropOverlay');
+const uploadPrompt = $('#uploadPrompt');
+const onionOverlay = $('#onionOverlay');
+const onionImg = $('#onionImg');
+const previewCanvas = $('#previewCanvas');
+const previewCtx = previewCanvas.getContext('2d');
+
+// ---- Video Upload ----
+
+const videoSection = $('#videoSection');
+videoSection.addEventListener('dragover', (e) => { e.preventDefault(); dropOverlay.classList.add('active'); });
+videoSection.addEventListener('dragleave', () => dropOverlay.classList.remove('active'));
+videoSection.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropOverlay.classList.remove('active');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('video/')) loadVideo(file);
+});
+
+$('#browseLink').addEventListener('click', () => $('#fileInput').click());
+$('#fileInput').addEventListener('change', (e) => {
+  if (e.target.files[0]) loadVideo(e.target.files[0]);
+});
+
+function loadVideo(file) {
+  if (state.videoUrl) URL.revokeObjectURL(state.videoUrl);
+  state.videoFile = file;
+  state.videoUrl = URL.createObjectURL(file);
+  video.src = state.videoUrl;
+  video.style.display = 'block';
+  uploadPrompt.style.display = 'none';
+  captureCanvas.style.display = 'none';
+  video.currentTime = 0;
+}
+
+video.addEventListener('loadedmetadata', () => {
+  captureCanvas.width = video.videoWidth;
+  captureCanvas.height = video.videoHeight;
+  updateTimestamp();
+});
+
+video.addEventListener('error', () => {
+  alert('Unable to play this video. The codec may not be supported in your browser. Try an .mp4 file with H.264 encoding.');
+});
+
+// ---- Timestamp ----
+
+function updateTimestamp() {
+  const t = video.currentTime || 0;
+  const min = Math.floor(t / 60);
+  const sec = Math.floor(t % 60);
+  const ms = Math.floor((t % 1) * 1000);
+  timestamp.textContent = `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;
+}
+
+video.addEventListener('timeupdate', updateTimestamp);
+
+// ---- Frame Seeking ----
+
+function seekFrame(delta) {
+  video.pause();
+  const frameSec = 1 / 30;
+  video.currentTime = Math.max(0, video.currentTime + delta * frameSec);
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!state.videoFile) return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+
+  if (e.key === 'ArrowLeft' && !e.shiftKey) { e.preventDefault(); seekFrame(-1); }
+  if (e.key === 'ArrowRight' && !e.shiftKey) { e.preventDefault(); seekFrame(1); }
+  if (e.key === 'ArrowLeft' && e.shiftKey) { e.preventDefault(); seekFrame(-10); }
+  if (e.key === 'ArrowRight' && e.shiftKey) { e.preventDefault(); seekFrame(10); }
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+  if (e.key === 'Delete' && state.selectedIndex >= 0) { e.preventDefault(); deleteFrame(state.selectedIndex); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'd') { e.preventDefault(); duplicateSelected(); }
+});
+
+$('#btnStepBack').addEventListener('click', () => seekFrame(-1));
+$('#btnStepFwd').addEventListener('click', () => seekFrame(1));
+$('#btnStepBack10').addEventListener('click', () => seekFrame(-10));
+$('#btnStepFwd10').addEventListener('click', () => seekFrame(10));
+$('#btnPlayPause').addEventListener('click', togglePlay);
+
+function togglePlay() {
+  if (!state.videoFile) return;
+  if (video.paused) { video.play(); $('#btnPlayPause').textContent = '⏸'; }
+  else { video.pause(); $('#btnPlayPause').textContent = '▶'; }
+}
+video.addEventListener('play', () => { $('#btnPlayPause').textContent = '⏸'; });
+video.addEventListener('pause', () => { $('#btnPlayPause').textContent = '▶'; });
+video.addEventListener('ended', () => { $('#btnPlayPause').textContent = '▶'; });
+
+// ---- Frame Capture ----
+
+$('#btnCapture').addEventListener('click', captureFrame);
+
+function captureFrame() {
+  if (!state.videoFile) return;
+  captureCanvas.width = video.videoWidth;
+  captureCanvas.height = video.videoHeight;
+  captureCtx.drawImage(video, 0, 0);
+  const dataURL = captureCanvas.toDataURL('image/jpeg', 0.92);
+
+  state.frames.push({
+    dataURL,
+    width: video.videoWidth,
+    height: video.videoHeight
+  });
+
+  flashCapture();
+  renderTimeline();
+  updateOnionSkin();
+}
+
+function flashCapture() {
+  const el = document.createElement('div');
+  el.className = 'capture-flash';
+  $('#videoContainer').appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
+}
+
+// ---- Onion Skinning ----
+
+function updateOnionSkin() {
+  if (!state.settings.onionSkinning || state.frames.length < 2) {
+    onionOverlay.classList.remove('active');
+    return;
+  }
+  const prevFrame = state.frames[state.frames.length - 2];
+  onionImg.src = prevFrame.dataURL;
+  onionOverlay.classList.add('active');
+  onionOverlay.style.setProperty('--onion-opacity', state.settings.onionOpacity);
+}
+
+$('#onionToggle').addEventListener('change', function () {
+  state.settings.onionSkinning = this.checked;
+  $('#onionOpacityGroup').style.display = this.checked ? '' : 'none';
+  updateOnionSkin();
+});
+
+$('#onionOpacity').addEventListener('input', function () {
+  state.settings.onionOpacity = this.value / 100;
+  $('#onionVal').textContent = this.value + '%';
+  onionOverlay.style.setProperty('--onion-opacity', state.settings.onionOpacity);
+});
+
+// ---- Timeline ----
+
+function renderTimeline() {
+  timelineStrip.innerHTML = '';
+  state.frames.forEach((frame, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'thumbnail-wrap';
+    if (i === state.selectedIndex) wrap.classList.add('selected');
+    wrap.draggable = true;
+    wrap.dataset.index = i;
+
+    const img = document.createElement('img');
+    img.src = frame.dataURL;
+    img.alt = `Frame ${i + 1}`;
+    img.draggable = false;
+
+    const num = document.createElement('span');
+    num.className = 'frame-num';
+    num.textContent = i + 1;
+
+    const del = document.createElement('button');
+    del.className = 'delete-btn';
+    del.textContent = '×';
+    del.addEventListener('click', (e) => { e.stopPropagation(); deleteFrame(i); });
+
+    wrap.appendChild(img);
+    wrap.appendChild(num);
+    wrap.appendChild(del);
+
+    wrap.addEventListener('click', () => selectFrame(i));
+
+    wrap.addEventListener('dragstart', (e) => {
+      wrap.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', i.toString());
+    });
+    wrap.addEventListener('dragend', () => { wrap.classList.remove('dragging'); });
+    wrap.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      wrap.classList.add('drag-over');
+    });
+    wrap.addEventListener('dragleave', () => { wrap.classList.remove('drag-over'); });
+    wrap.addEventListener('drop', (e) => {
+      e.preventDefault();
+      wrap.classList.remove('drag-over');
+      const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+      const toIdx = i;
+      if (fromIdx !== toIdx) reorderFrames(fromIdx, toIdx);
+    });
+
+    timelineStrip.appendChild(wrap);
+  });
+
+  $('#frameCount').textContent = `${state.frames.length} frame${state.frames.length !== 1 ? 's' : ''}`;
+}
+
+function selectFrame(i) {
+  state.selectedIndex = (state.selectedIndex === i) ? -1 : i;
+  renderTimeline();
+}
+
+function deleteFrame(i) {
+  state.frames.splice(i, 1);
+  if (state.selectedIndex >= state.frames.length) state.selectedIndex = state.frames.length - 1;
+  if (state.frames.length === 0) state.selectedIndex = -1;
+  renderTimeline();
+  updateOnionSkin();
+}
+
+function reorderFrames(from, to) {
+  const [moved] = state.frames.splice(from, 1);
+  state.frames.splice(to, 0, moved);
+  state.selectedIndex = to;
+  renderTimeline();
+}
+
+function duplicateSelected() {
+  if (state.selectedIndex < 0) return;
+  const frame = state.frames[state.selectedIndex];
+  state.frames.splice(state.selectedIndex + 1, 0, { ...frame, dataURL: frame.dataURL });
+  state.selectedIndex++;
+  renderTimeline();
+  updateOnionSkin();
+}
+
+$('#btnSelectAll').addEventListener('click', () => {
+  if (state.frames.length === 0) return;
+  state.selectedIndex = 0;
+  renderTimeline();
+});
+
+$('#btnClearAll').addEventListener('click', () => {
+  if (state.frames.length === 0) return;
+  if (!confirm(`Delete all ${state.frames.length} frames?`)) return;
+  state.frames = [];
+  state.selectedIndex = -1;
+  onionOverlay.classList.remove('active');
+  renderTimeline();
+});
+
+$('#btnDuplicate').addEventListener('click', duplicateSelected);
+
+// ---- Settings ----
+
+$('#frameDuration').addEventListener('input', function () {
+  state.settings.frameDuration = parseInt(this.value);
+  $('#durVal').textContent = this.value + 'ms';
+});
+
+$('#loopCount').addEventListener('input', function () {
+  state.settings.loopCount = parseInt(this.value) || 0;
+});
+
+$('#resolution').addEventListener('change', function () {
+  state.settings.resolution = this.value;
+  $('#customWidthGroup').style.display = this.value === 'custom' ? '' : 'none';
+});
+
+$('#customWidth').addEventListener('input', function () {
+  state.settings.customWidth = parseInt(this.value) || 480;
+});
+
+function getOutputDimensions(frameW, frameH) {
+  if (state.settings.resolution === 'original') return { w: frameW, h: frameH };
+  if (state.settings.resolution === 'half') return { w: Math.round(frameW / 2), h: Math.round(frameH / 2) };
+  const ratio = frameH / frameW;
+  const w = state.settings.customWidth;
+  return { w, h: Math.round(w * ratio) };
+}
+
+// ---- Preview Modal ----
+
+$('#btnPreview').addEventListener('click', openPreview);
+$('#previewClose').addEventListener('click', closePreview);
+$('#previewModal').addEventListener('click', function (e) { if (e.target === this) closePreview(); });
+
+function openPreview() {
+  if (state.frames.length === 0) { alert('Capture at least one frame first.'); return; }
+
+  state.previewFrameIdx = 0;
+  state.previewPlaying = true;
+  $('#previewModal').style.display = 'flex';
+  $('#previewPlayPause').textContent = '⏸ Pause';
+  renderPreviewFrame();
+  startPreviewTimer();
+}
+
+function closePreview() {
+  state.previewPlaying = false;
+  clearInterval(state.previewTimer);
+  state.previewTimer = null;
+  $('#previewModal').style.display = 'none';
+}
+
+function renderPreviewFrame() {
+  const frame = state.frames[state.previewFrameIdx];
+  if (!frame) return;
+  const { w, h } = getOutputDimensions(frame.width, frame.height);
+  previewCanvas.width = w;
+  previewCanvas.height = h;
+  const img = new Image();
+  img.onload = () => { previewCtx.drawImage(img, 0, 0, w, h); };
+  img.src = frame.dataURL;
+}
+
+function startPreviewTimer() {
+  clearInterval(state.previewTimer);
+  state.previewTimer = setInterval(() => {
+    if (!state.previewPlaying) return;
+    state.previewFrameIdx = (state.previewFrameIdx + 1) % state.frames.length;
+    renderPreviewFrame();
+  }, state.settings.frameDuration);
+}
+
+$('#previewRestart').addEventListener('click', () => {
+  state.previewFrameIdx = 0;
+  renderPreviewFrame();
+  if (!state.previewPlaying) {
+    state.previewPlaying = true;
+    $('#previewPlayPause').textContent = '⏸ Pause';
+    startPreviewTimer();
+  }
+});
+
+$('#previewPlayPause').addEventListener('click', () => {
+  state.previewPlaying = !state.previewPlaying;
+  $('#previewPlayPause').textContent = state.previewPlaying ? '⏸ Pause' : '▶ Play';
+  if (state.previewPlaying) startPreviewTimer();
+  else clearInterval(state.previewTimer);
+});
+
+// ---- GIF Export ----
+
+$('#btnExport').addEventListener('click', exportGif);
+
+function estimateSize() {
+  if (state.frames.length === 0) return 0;
+  const { w, h } = getOutputDimensions(state.frames[0].width, state.frames[0].height);
+  return state.frames.length * w * h;
+}
+
+function exportGif() {
+  if (state.frames.length === 0) { alert('Capture at least one frame before exporting.'); return; }
+
+  const sizeEstimate = estimateSize();
+  const warnEl = $('#sizeWarning');
+  if (sizeEstimate > 50 * 1024 * 1024) {
+    warnEl.classList.add('show');
+  } else {
+    warnEl.classList.remove('show');
+  }
+
+  const { w, h } = getOutputDimensions(state.frames[0].width, state.frames[0].height);
+
+  const gif = new GIF({
+    workers: 4,
+    quality: 10,
+    width: w,
+    height: h,
+    workerScript: 'https://cdn.jsdelivr.net/npm/gif.js.optimized@2.0.1/dist/gif.optimized.worker.js',
+    repeat: state.settings.loopCount
+  });
+
+  const progressWrap = $('#progressWrap');
+  const progressBar = $('#progressBar');
+  progressWrap.classList.add('active');
+  progressBar.style.width = '0%';
+
+  gif.on('progress', (p) => {
+    progressBar.style.width = Math.round(p * 100) + '%';
+  });
+
+  gif.on('finished', (blob) => {
+    progressWrap.classList.remove('active');
+    const url = URL.createObjectURL(blob);
+    const now = new Date();
+    const filename = `stopmotion_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}-${String(now.getSeconds()).padStart(2,'0')}.gif`;
+
+    const result = $('#exportResult');
+    result.innerHTML = `
+      <img src="${url}" alt="Exported GIF">
+      <div style="margin-top:12px">
+        <a class="btn accent" href="${url}" download="${filename}">⬇ Download GIF</a>
+      </div>
+    `;
+  });
+
+  let loaded = 0;
+  state.frames.forEach((frame) => {
+    const img = new Image();
+    img.onload = () => {
+      const tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width = w;
+      tmpCanvas.height = h;
+      const tmpCtx = tmpCanvas.getContext('2d');
+      tmpCtx.drawImage(img, 0, 0, w, h);
+
+      gif.addFrame(tmpCanvas, { delay: state.settings.frameDuration, copy: true });
+
+      loaded++;
+      if (loaded === state.frames.length) {
+        gif.render();
+      }
+    };
+    img.src = frame.dataURL;
+  });
+}
+</script>
+</body>
+</html>
