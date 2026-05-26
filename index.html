@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stop Motion Maker</title>
-<script src="https://cdn.jsdelivr.net/npm/gif.js.optimized@2.0.1/dist/gif.optimized.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
 <style>
 /* license GPL Jonas Immanuel Frey */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -673,7 +673,7 @@ function exportGif() {
     quality: 10,
     width: w,
     height: h,
-    workerScript: 'https://cdn.jsdelivr.net/npm/gif.js.optimized@2.0.1/dist/gif.optimized.worker.js',
+    workerScript: 'https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js',
     repeat: state.settings.loopCount
   });
 
