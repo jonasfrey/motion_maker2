@@ -231,6 +231,21 @@ function corsHeaders(req: Request): Record<string, string> {
     : {};
 }
 
+// ---- CDN proxy (cross-origin worker workaround) ----
+
+let gifWorkerScript: ArrayBuffer | null = null;
+
+async function handleGifWorker(): Promise<Response> {
+  if (!gifWorkerScript) {
+    const resp = await fetch("https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js");
+    if (!resp.ok) return new Response("Worker script not found", { status: 502 });
+    gifWorkerScript = await resp.arrayBuffer();
+  }
+  return new Response(gifWorkerScript, {
+    headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=86400" },
+  });
+}
+
 // ---- Router ----
 
 async function handler(req: Request): Promise<Response> {
@@ -248,6 +263,11 @@ async function handler(req: Request): Promise<Response> {
 
   if (url.pathname === "/api/extract-frames" && req.method === "POST") {
     return addCors(await handleExtractFrames(req), req);
+  }
+
+  // Proxy gif.worker.js to avoid cross-origin Worker restriction
+  if (url.pathname === "/lib/gif.worker.js") {
+    return handleGifWorker();
   }
 
   // Static files
